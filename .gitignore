@@ -29,5 +29,6 @@ data/
 *.dvi
 *.ps
 
-# LaTeX source
-*.tex
+# LaTeX generated source files (not the main report)
+*.bbl
+*.blg
