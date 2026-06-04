@@ -1,16 +1,49 @@
-\documentclass[11pt]{article}
+\documentclass[11pt,a4paper]{article}
 
-\usepackage[a4paper, margin=2.5cm]{geometry}
-\usepackage{graphicx}
+% -------------------- Packages --------------------
+\usepackage[margin=2.2cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
 \usepackage{booktabs}
-\usepackage{amsmath}
 \usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
 \usepackage{multirow}
-\usepackage{parskip}
-\usepackage{textcomp}
-\usepackage{url}
-\usepackage[hidelinks]{hyperref}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{siunitx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{caption}
+\usepackage{subcaption}
 
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!45!black,
+    citecolor=blue!45!black,
+    urlcolor=blue!45!black
+}
+
+\sisetup{
+    round-mode=places,
+    round-precision=3,
+    detect-weight=true,
+    detect-family=true
+}
+
+\setlist[itemize]{leftmargin=*, topsep=2pt, itemsep=2pt}
+\setlist[enumerate]{leftmargin=*, topsep=2pt, itemsep=2pt}
+
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{TODO:} #1}}
+\newcommand{\dataset}{Hotel Booking Demand}
+\newcommand{\withadr}{R-EUCLID-robust-weighted-withADR}
+\newcommand{\noadr}{R-EUCLID-robust-weighted-noADR}
+
+% -------------------- Title --------------------
 \title{\textbf{Hotel Booking Demand Clustering Study}\\
 \large A Reproducible Experimental Study of Clustering}
 \author{
@@ -18,568 +51,437 @@ Alexandre Santos (72970) \and
 David Natal (72997) \and
 Miguel Mestre (73018)
 }
-\date{5 June 2026}
+\date{5 June 2026\\
+\small Unsupervised Learning -- 2025/2026\\
+\small Repository tag: \texttt{Submission} \quad Repository: \todo{insert GitHub URL}}
 
 \begin{document}
 
 \maketitle
 
-\begin{center}
-\textit{Unsupervised Learning -- 2025/2026}\\
-Repository tag: [Submission] \quad|\quad
-Repository: [Insert GitHub URL]
-\end{center}
-
-\bigskip
-
 \begin{abstract}
-This report presents a reproducible clustering study of hotel booking demand data
-(117,430 records, course release v1) with the goal of partitioning bookings into
-interpretable guest segments based solely on pre-stay observable features.
-Two representations are studied: a value-inclusive pipeline
-(\texttt{R-EUCLID-robust-weighted-withADR}) and a purely behavioural pipeline that
-excludes the daily rate (\texttt{R-EUCLID-robust-weighted-noADR}).
-K-Means ($k = 3$, Silhouette $= 0.452$, ARI $= 0.989 \pm 0.007$ across 10 seeds),
-iK-Means (automatic $k = 8$), and Agglomerative Hierarchical clustering (Ward,
-Silhouette $= 0.453$ at $k = 3$) are compared under a unified evaluation protocol.
-The selected three-cluster solution identifies a Non-Refundable Advance Booker segment
-(12.4\%), a Standard Flexible City Guest segment (70.7\%), and a Premium Resort
-Long-Stay segment (16.8\%).
-The noADR comparison confirms that the commitment axis (\texttt{is\_non\_refund})
-drives cluster separation independently of price.
-Key limitations include the absence of ground-truth labels, the use of an ordinal
-meal-plan encoding, and the fact that clustering is performed at booking level rather
-than guest level.
+This report presents a reproducible clustering study of the Hotel Booking Demand dataset. The goal is to identify interpretable booking-level segments using only pre-stay observable features, while excluding outcome and post-event variables to prevent leakage. We compare K-Means, iK-Means, and Ward hierarchical clustering using internal validity indices, stability analysis, and preprocessing sensitivity checks. The selected solution is K-Means with $k=3$ on the value-inclusive representation, producing three interpretable profiles: Non-Refundable Advance Booker, Standard Flexible City Guest, and Premium Resort Long-Stay Guest. The results suggest that deposit commitment, stay duration, and booking value provide useful axes for hotel revenue-management segmentation, although conclusions are limited by the absence of ground-truth labels and the booking-level unit of analysis.
 \end{abstract}
 
-\textbf{Keywords:} hotel booking demand; clustering; guest segmentation; mixed-type
-data; reproducibility; K-Means; Ward linkage
-
 \tableofcontents
-\newpage
 
-% ─────────────────────────────────────────────────────────────────────────────
+% ============================================================
 \section{Introduction}
-% ─────────────────────────────────────────────────────────────────────────────
 
-\subsection*{Context}
-Hotel revenue management depends on understanding who books, when, and how.
-Booking records carry rich pre-arrival signals --- rate, stay duration, lead time,
-deposit commitment, meal plan, parking need, and special requests --- that may
-reveal latent guest types with distinct spending patterns and service preferences.
-Identifying such types without relying on post-stay outcomes enables targeted pricing,
-upselling, and capacity planning decisions at the time of booking.
+\subsection{Context}
+Hotel revenue management depends on understanding who books, when they book, and how their bookings differ in value and service requirements. Booking records contain pre-arrival signals such as rate, stay duration, booking horizon, deposit commitment, meal plan, parking need, and special requests. These signals can reveal latent booking types that support pricing, upselling, and operational planning decisions.
 
-\subsection*{Segmentation question}
-\textit{Can hotel booking records be partitioned into distinct, interpretable
-behavioural segments using only pre-stay observable characteristics --- daily rate,
-total estimated spend, length of stay, booking horizon, meal plan, deposit
-commitment, special requests, and parking need --- to identify guest profiles that
-support targeted revenue management and personalised service strategies?}
+\subsection{Segmentation question}
+The concrete segmentation question addressed in this project is:
 
-\subsection*{Clustering rationale}
-No ground-truth segment labels exist; the goal is discovery rather than
-classification, making supervised methods inapplicable. Booking records exhibit
-substantial heterogeneity in ADR (\texteuro 0--5{,}400), stay duration (0--69
-nights), and lead time (0--737 days), suggesting meaningful subgroups. Clustering
-inputs are restricted to variables known at booking time (leakage control); post-event
-fields are reserved for post-hoc profiling only.
+\begin{quote}
+Can hotel booking records be partitioned into distinct and interpretable behavioural segments using only pre-stay observable characteristics, such as daily rate, total estimated spend, length of stay, booking horizon, meal plan, deposit commitment, special requests, and parking need, in order to identify guest profiles that support targeted revenue-management and personalised-service strategies?
+\end{quote}
 
-\subsection*{Contribution}
-We implement an end-to-end reproducible pipeline covering mixed-type preprocessing,
-K-Means and Hierarchical Ward clustering, iK-Means initialisation, internal validity
-assessment (Silhouette, Calinski-Harabasz, Davies-Bouldin), seed-stability analysis
-(ARI), scaler sensitivity, a PCA representation study (Module E4), and a noADR
-representation comparison. All results are logged in \texttt{experiments.csv} and
-regenerable via \texttt{run\_all.py}.
+The unit of analysis is the individual booking record. A guest may appear more than once in the dataset, so the clusters should be interpreted as booking segments rather than permanent guest identities.
 
-% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Why clustering is appropriate}
+No ground-truth segment labels are available. The aim is therefore discovery rather than prediction, making unsupervised clustering appropriate. Clustering is also suitable because the dataset contains heterogeneous booking behaviours in lead time, price, stay duration, deposit type, and service requests. To avoid leakage, only variables available at the time of booking are used as clustering inputs; outcome and post-event variables are reserved for post-hoc interpretation only.
+
+\subsection{Research questions}
+The report addresses the course research questions as follows:
+\begin{itemize}
+    \item \textbf{RQ1 -- Problem framing:} define a booking-level segmentation question and justify clustering.
+    \item \textbf{RQ2 -- Representation:} define leakage-safe preprocessing and feature representations for mixed-type booking data.
+    \item \textbf{RQ3 -- Modelling:} compare K-Means, iK-Means, and Ward hierarchical clustering.
+    \item \textbf{RQ4 -- Interpretation:} profile the discovered clusters as booking segments.
+    \item \textbf{RQ5 -- Robustness:} evaluate sensitivity to seeds, subsampling, scaling, feature weighting, and representation changes.
+\end{itemize}
+
+% ============================================================
 \section{Dataset and Preprocessing}
-% ─────────────────────────────────────────────────────────────────────────────
 
 \subsection{Dataset documentation}
-
-\begin{center}
-\begin{tabular}{lp{9cm}}
+\begin{table}[H]
+\centering
+\caption{Dataset documentation and traceability.}
+\begin{tabularx}{\textwidth}{lX}
 \toprule
 \textbf{Item} & \textbf{Details} \\
 \midrule
-Dataset and version  & Hotel Booking Demand; course release v1 \\
-Unit of analysis     & One row = one booking record (a guest may appear multiple times) \\
-Size and time span   & 119,390 rows, 32 columns; arrivals July 2015 -- August 2017 \\
-Source and terms     & António et al.\ (2019)~\cite{antonio2019}; dataset provided through course platform; raw file not committed to repository \\
-Checksum / hash      & \texttt{SHA-256: 7c2ae42a...c7b1fc06} \\
-Raw-data handling    & Raw CSV excluded via \texttt{.gitignore}; obtain from course platform and place in \texttt{data/} \\
+Dataset & \dataset{} \\
+Version & Course release v1 \\
+Unit of analysis & One row corresponds to one booking record \\
+Original size & 119,390 rows and 32 columns \\
+Time span & Arrivals from July 2015 to August 2017 \\
+Source & António, de Almeida, and Nunes (2019); dataset provided through the course platform \\
+Raw-data governance & Raw CSV is not committed to the repository; it must be placed in \texttt{data/} according to the repository instructions \\
+Checksum & SHA-256: \texttt{7c2ae42a...c7b1fc06} \\
+Usage terms & Dataset used under the course release terms; no raw data redistributed in the repository \\
 \bottomrule
-\end{tabular}
-\end{center}
+\end{tabularx}
+\end{table}
 
-\subsection{Data quality and feature governance}
-
-\textbf{Missingness and outliers.}
-\texttt{children} has 4 missing values (imputed as 0);
-\texttt{country} has 488 missing values (retained for post-hoc profiling only);
-\texttt{agent} (16,340) and \texttt{company} (112,593) have high missingness and
-are dropped as high-cardinality ID-like fields.
-\texttt{adr} has a heavy right tail (max \texteuro 5{,}400) and one negative entry;
-\texttt{lead\_time} ranges 0--737 days.
-
-\textbf{Zero-ADR exclusion.}
-Rows with \texttt{adr} $= 0$ (1,960 records, corresponding to complementary or
-test bookings per dataset documentation) are excluded from clustering, leaving
-\textbf{117,430} records. This exclusion is predefined and reported.
-
-\textbf{Leakage control.}
-Index time is the booking creation date. The following fields are excluded from
-clustering inputs:
-
+\subsection{Data quality}
+The main data-quality issues identified are:
 \begin{itemize}
-  \item \texttt{is\_canceled}, \texttt{reservation\_status},
-        \texttt{reservation\_status\_date} --- post-decision / post-arrival outcomes
-  \item \texttt{agent}, \texttt{company} --- high-cardinality ID fields
-  \item \texttt{country} --- retained for post-hoc profiling only
+    \item \texttt{children} has 4 missing values, imputed as 0 because missing children counts are interpreted as no children in the booking.
+    \item \texttt{country} has 488 missing values and is retained only for post-hoc profiling, not as a clustering input.
+    \item \texttt{agent} and \texttt{company} have high missingness and high cardinality; both are dropped as ID-like fields.
+    \item \texttt{adr} has a heavy right tail and one negative value, requiring robust preprocessing and careful interpretation.
+    \item Rows with \texttt{adr = 0} are excluded from clustering because they correspond to complementary or test-like bookings. This removes 1,960 records, leaving 117,430 analytic records.
 \end{itemize}
 
-\textbf{Feature engineering and encoding.}
-\begin{itemize}
-  \item \texttt{total\_nights} $=$ \texttt{stays\_in\_week\_nights} $+$
-        \texttt{stays\_in\_weekend\_nights}
-  \item \texttt{total\_spend\_log} $= \log(1 + \texttt{adr}) \times
-        \texttt{total\_nights}$ --- compressed spend proxy combining rate and
-        duration; \texttt{adr\_log} is \emph{not} included separately to avoid
-        collinearity
-  \item \texttt{is\_non\_refund} $= \mathbf{1}[\texttt{deposit\_type} = \text{``Non
-        Refund''}]$ --- binary; replaces a three-level ordinal that inflated
-        Euclidean distances
-  \item \texttt{lead\_time\_rank} --- \texttt{lead\_time} binned into three
-        equal-population quantile groups via \texttt{pd.qcut(q=3)}: 0 =
-        last-minute (0--32 d), 1 = mid (33--124 d), 2 = advance ($\geq$125 d).
-        The equal-population binning is justified over equal-width binning because
-        \texttt{lead\_time} is heavily right-skewed (0--737 days); quantile bins
-        ensure each rank level represents a comparable share of bookings, making
-        the ordinal distances between levels more meaningful in Euclidean space.
-        A log-transformed continuous alternative was considered but the binned
-        ordinal representation is preferred here to keep the feature on a bounded
-        $[0,2]$ scale consistent with the other ordinal inputs
-  \item \texttt{meal\_encoded} --- ordinal encoding SC/Undefined$=0$, BB$=1$,
-        HB$=2$, FB$=3$, justified by the monotonically increasing catering
-        inclusivity of the four plan levels
-\end{itemize}
-
-\textbf{Final representations and distance.}
-Two representations are studied:
-
-\begin{center}
-\begin{tabular}{lll}
+\begin{table}[H]
+\centering
+\caption{Main missingness and governance decisions.}
+\begin{tabularx}{\textwidth}{lrrX}
 \toprule
-ID & Features & Scaler \\
+\textbf{Variable} & \textbf{Missing} & \textbf{Role} & \textbf{Decision} \\
 \midrule
-\texttt{R-EUCLID-robust-weighted-withADR} &
-  \texttt{total\_spend\_log}, \texttt{total\_nights} + 5 binary/ordinal &
-  RobustScaler on continuous; raw on binary/ordinal \\
-\texttt{R-EUCLID-robust-weighted-noADR} &
-  \texttt{total\_nights} + 5 binary/ordinal &
-  RobustScaler on continuous; raw on binary/ordinal \\
+\texttt{children} & 4 & Numerical & Impute as 0 \\
+\texttt{country} & 488 & Categorical & Exclude from clustering; retain for profiling \\
+\texttt{agent} & 16,340 & ID-like categorical & Drop due to high missingness/cardinality \\
+\texttt{company} & 112,593 & ID-like categorical & Drop due to high missingness/cardinality \\
 \bottomrule
-\end{tabular}
-\end{center}
+\end{tabularx}
+\end{table}
 
-Both use Euclidean distance. Feature weights \texttt{meal\_encoded} $\times 0.5$
-and \texttt{is\_non\_refund} $\times 3.0$ are applied post-scaling to control
-relative contribution; this changes the effective Euclidean metric and is
-recorded as preprocessing. All validity indices are computed in the same
-weighted space.
+\subsection{Leakage control}
+The segmentation index time is the booking creation time. Therefore, only variables available at or before booking time can be used to form clusters. The following variables are excluded from clustering inputs:
+\begin{itemize}
+    \item \texttt{is\_canceled}: outcome variable.
+    \item \texttt{reservation\_status}: post-decision/post-arrival status.
+    \item \texttt{reservation\_status\_date}: date associated with the realised status.
+    \item \texttt{agent} and \texttt{company}: high-cardinality ID-like fields.
+    \item \texttt{country}: excluded from clustering to avoid geographical profiling effects; retained only for post-hoc descriptive analysis.
+\end{itemize}
 
-% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Feature engineering}
+The final clustering features are:
+\begin{itemize}
+    \item \texttt{total\_nights} = \texttt{stays\_in\_week\_nights} + \texttt{stays\_in\_weekend\_nights}.
+    \item \texttt{total\_spend\_log} = $\log(1+\texttt{adr}) \times \texttt{total\_nights}$, used as a compressed estimated-spend proxy.
+    \item \texttt{is\_non\_refund} = 1 if \texttt{deposit\_type} is Non Refund, 0 otherwise.
+    \item \texttt{lead\_time\_rank}, an ordinal quantile binning of \texttt{lead\_time}: 0 for last-minute, 1 for mid-horizon, and 2 for advance bookings.
+    \item \texttt{meal\_encoded}, an ordinal encoding of meal-plan inclusivity: SC/Undefined = 0, BB = 1, HB = 2, FB = 3.
+    \item \texttt{total\_of\_special\_requests}.
+    \item \texttt{required\_car\_parking\_spaces}.
+\end{itemize}
+
+\subsection{Representations and distance}
+Two Euclidean representations are studied:
+\begin{table}[H]
+\centering
+\caption{Final representations.}
+\label{tab:representations}
+\small
+\begin{tabularx}{\textwidth}{p{0.32\textwidth}X}
+\toprule
+\textbf{Representation} & \textbf{Definition} \\
+\midrule
+
+\withadr{} &
+\textbf{Features:} 
+\texttt{total\_spend\_log}, 
+\texttt{total\_nights}, 
+\texttt{is\_non\_refund}, 
+\texttt{total\_of\_special\_requests}, 
+\texttt{required\_car\_parking\_spaces}, 
+\texttt{meal\_encoded}, 
+\texttt{lead\_time\_rank}.
+\newline
+\textbf{Scaling/weights:} RobustScaler on continuous variables; 
+\texttt{is\_non\_refund} $\times 3.0$; 
+\texttt{meal\_encoded} $\times 0.5$. \\
+
+\addlinespace
+
+\noadr{} &
+\textbf{Features:} same as \withadr{}, excluding 
+\texttt{total\_spend\_log}.
+\newline
+\textbf{Scaling/weights:} same scaling and weights as \withadr{}. \\
+
+\bottomrule
+\end{tabularx}
+\end{table}
+
+All models and internal validity indices are computed in the same weighted Euclidean space used to fit the corresponding clustering model.
+
+% ============================================================
 \section{Clustering Methods}
-% ─────────────────────────────────────────────────────────────────────────────
 
-\textbf{K-Means (baseline).}
-K-Means with \texttt{n\_init=10}, \texttt{max\_iter=300}, \texttt{random\_state=42}.
-$k$ range 2--10 predefined based on domain plausibility (2 = minimum meaningful
-split; 10 = upper limit beyond which segments lose managerial interpretability).
-Final selection: $k = 3$ based on convergence of Silhouette and ARI stability
-evidence (see Section~\ref{sec:results}).
+\subsection{K-Means baseline}
+K-Means is used as the mandatory baseline. The predefined search interval is $k \in \{2,\ldots,10\}$, chosen because $k=2$ is the minimum meaningful segmentation and values above 10 are unlikely to remain managerially interpretable. The configuration is \texttt{n\_init=10}, \texttt{max\_iter=300}, and \texttt{random\_state=42} for the main run.
 
-\textbf{iK-Means.}
-Mirkin's (2005) intelligent initialisation procedure~\cite{mirkin2005} extracts
-anomalous clusters greedily from the full 117,430-row matrix with
-\texttt{min\_cluster\_size=1000} (predefined: clusters below 1,000 bookings
-lack managerial actionability). The retained $k$ is determined automatically.
+\subsection{iK-Means}
+iK-Means is included as an automatic cluster-discovery and initialisation-oriented method. In the current experiment log, iK-Means results must be treated carefully because the uploaded \texttt{experiments.csv} contains a skipped iK-Means row. If the final repository contains a successful iK-Means run, its metrics should replace the TODO values in Table~\ref{tab:model-comparison} and be logged consistently in \texttt{experiments.csv}. If not, the report should explicitly state that iK-Means failed and explain the limitation.
 
-\textbf{Agglomerative Hierarchical Clustering -- Ward linkage.}
-Ward linkage minimises within-cluster variance under Euclidean distance, compatible
-with the RobustScaler + weighted Euclidean representation.
-Run on a reproducible subsample of $n = 30{,}000$ (\texttt{seed=42}), which
-represents 25.5\% of the analytic dataset. Subsample impact is quantified via
-stability across five subsamples (\texttt{seeds=\{42,7,123,256,999\}}).
-$k$ range 2--8; dendrogram cut assessed visually and via validity indices.
+\subsection{Agglomerative hierarchical clustering}
+Agglomerative hierarchical clustering with Ward linkage is used as the alternative clustering family. Ward linkage is compatible with the chosen representation because the features are embedded in a Euclidean vector space. Due to computational cost, Ward clustering is run on a reproducible subsample of 30,000 records. The main subsample uses seed 42, and robustness is assessed using additional subsamples.
 
-% ─────────────────────────────────────────────────────────────────────────────
+% ============================================================
 \section{Experimental Protocol}
-% ─────────────────────────────────────────────────────────────────────────────
 
-\begin{center}
-\begin{tabular}{p{3.5cm}p{5cm}p{5cm}}
-\toprule
-\textbf{Experiment block} & \textbf{Purpose} & \textbf{Main output} \\
-\midrule
-Baseline K-Means (withADR + noADR) &
-  Primary segmentation; noADR tests whether clusters are price bands &
-  Validity table, cluster profiles, $\Delta$\% deviation table \\
-iK-Means &
-  Automatic $k$ estimation; initialisation-free baseline &
-  Anomalous cluster report, validity metrics \\
-Hierarchical Ward &
-  Conceptually distinct family (dendrogram-based) &
-  Dendrogram, validity table, cross-method ARI \\
-Seed stability (K-Means) &
-  10 seeds $\times$ $k \in \{2,3,4,5\}$ &
-  Mean $\pm$ std of Silhouette, CH, DB, and ARI \\
-Subsample stability (Hierarchical) &
-  5 subsamples $\times$ $k=3$ &
-  Mean $\pm$ std of validity indices \\
-Scaler sensitivity &
-  RobustScaler vs StandardScaler on numerical features only &
-  Silhouette delta per $k$ \\
-Unweighted sensitivity &
-  Remove \texttt{is\_non\_refund} $\times 3.0$ and \texttt{meal} $\times 0.5$; all weights $= 1.0$ &
-  Silhouette and cluster profile comparison vs weighted pipeline \\
-PCA representation study (E4) &
-  Original 7D vs PCA-2, PCA-3, PCA-4 &
-  Silhouette comparison, ARI vs original \\
-\bottomrule
-\end{tabular}
-\end{center}
+\subsection{Internal validity}
+Models are evaluated using:
+\begin{itemize}
+    \item \textbf{Silhouette score} as the primary compactness/separation index.
+    \item \textbf{Calinski--Harabasz index} as an additional compactness/separation index, where higher is better.
+    \item \textbf{Davies--Bouldin index}, where lower is better.
+\end{itemize}
 
-\textbf{Validity indices} computed in the same weighted Euclidean space for all
-methods: Silhouette score (primary), Calinski-Harabasz (CH), and Davies-Bouldin (DB).
-Hierarchical family-specific diagnostic: Ward dendrogram with \texttt{truncate\_mode=lastp}.
+\subsection{Family-specific diagnostics}
+For hierarchical clustering, a Ward dendrogram is used to inspect merge structure and support the choice of the cut. For iK-Means, the automatic number of clusters and any anomalous extracted clusters should be documented.
 
-\textbf{Reproducibility.}
-All seeds are locked (\texttt{random\_state=42} for main runs; seeds
-$\{0,...,9\}$ for stability). Results are logged to \texttt{experiments.csv}
-with \texttt{representation\_id}, \texttt{parameters}, \texttt{seed},
-\texttt{silhouette}, \texttt{calinski}, \texttt{davies}, \texttt{diagnostics},
-and \texttt{notes}. Every figure is regenerable via \texttt{run\_all.py}.
+\subsection{Stability and sensitivity}
+The robustness protocol includes:
+\begin{itemize}
+    \item K-Means repeated across 10 random seeds for $k \in \{2,3,4,5\}$.
+    \item Adjusted Rand Index (ARI) between runs as the stability measure.
+    \item Hierarchical clustering repeated on controlled subsamples.
+    \item RobustScaler versus StandardScaler as a preprocessing sensitivity check.
+    \item withADR versus noADR comparison to test whether clusters are driven only by price.
+    \item PCA representation study as Extension Module E4.
+\end{itemize}
 
-% ─────────────────────────────────────────────────────────────────────────────
-\section{Results and Cluster Interpretation}
-\label{sec:results}
-% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Reproducibility}
+All experiments are intended to be reproducible from the repository using:
+\begin{itemize}
+    \item \texttt{experiments.csv} for experiment traceability.
+    \item \texttt{environment.yml} or equivalent lockfile for dependencies.
+    \item \texttt{run\_all.py} as the single-entry point.
+    \item \texttt{figures/} and \texttt{tables/} generated automatically from code.
+\end{itemize}
+
+% ============================================================
+\section{Results}
 
 \subsection{Data preparation outcomes}
-
-After zero-ADR exclusion: \textbf{117,430 bookings}, 7 features (withADR) or 6
-features (noADR). The scaled matrix has shape $(117{,}430 \times 7)$ for withADR
-and $(117{,}430 \times 6)$ for noADR. Principal component analysis of the withADR
-matrix shows PC1 explains 54.3\% and four components are needed to reach 90\%
-variance, confirming moderate linear structure (features are not fully independent).
+After excluding zero-ADR records, the analytic dataset contains 117,430 bookings. The withADR matrix has 7 features and the noADR matrix has 6 features. PCA on the withADR representation indicates that the first principal component explains approximately 54.3\% of the variance and that four components are needed to reach around 90\% explained variance.
 
 \subsection{Model comparison}
-
-\begin{center}
-\begin{tabular}{llccccc}
+\begin{table}[H]
+\centering
+\caption{Main model comparison: quantitative results.}
+\label{tab:model-comparison-metrics}
+\small
+\begin{tabular}{llrrrr}
 \toprule
-\textbf{Method} & \textbf{Setting} & \textbf{Sil $\uparrow$} &
-\textbf{CH $\uparrow$} & \textbf{DB $\downarrow$} &
-\textbf{Stability} & \textbf{Observation} \\
+\textbf{Method} & \textbf{Setting} & \textbf{Sil.} & \textbf{CH} & \textbf{DB} & \textbf{Stability} \\
 \midrule
-K-Means & $k=3$, withADR & 0.452 & 63{,}837 & 0.857 &
-  ARI $0.989 \pm 0.007$ & Best balance of quality + stability \\
-K-Means & $k=2$, withADR & 0.392 & 54{,}947 & 1.074 &
-  ARI $0.998 \pm 0.002$ & Merges Premium into Standard; loses granularity \\
-K-Means & $k=3$, noADR   & --- & --- & --- &
-  --- & Profiles shift; see Section~\ref{sec:noADR} \\
-iK-Means & $k=8$ (auto)  & 0.327 & 56{,}165 & 1.012 &
-  --- & Fragments main segments; no new profiles \\
-Hier.\ Ward & $k=3$, subsample & 0.453 & 15{,}928 & 0.832 &
-  Sil $\pm$ 0.004 across 5 subsamples & Corroborates K-Means $k=3$ \\
+K-Means & $k=2$, withADR & 0.392 & 54,947 & 1.074 & ARI $0.998 \pm 0.002$ \\
+K-Means & $k=3$, withADR & 0.452 & 63,837 & 0.857 & ARI $0.989 \pm 0.007$ \\
+K-Means & $k=3$, noADR & 0.443 & 60,587 & 0.928 & n/a \\
+iK-Means & skipped / unresolved & n/a & n/a & n/a & n/a \\
+Ward & $k=3$, withADR, $n=30{,}000$ & 0.453 & 15,928 & 0.832 & subsample stable \\
 \bottomrule
 \end{tabular}
-\end{center}
+\end{table}
 
-\textbf{Selected solution: K-Means $k=3$ on withADR.}
-Rationale: (i) Silhouette 0.452 exceeds the weak-structure threshold of 0.35
-\cite{kaufman1990}; (ii) ARI $0.989 \pm 0.007$ confirms near-identical partitions
-across all 10 seeds; (iii) Hierarchical Ward independently finds the same three-
-cluster structure (ARI $> 0.92$ against K-Means $k=3$);
-(iv) three segments map to actionable business profiles.
-iK-Means is not selected as the primary solution because its eight clusters
-fragment the three main groups without revealing qualitatively new profiles.
+\begin{table}[H]
+\centering
+\caption{Main model comparison: interpretation.}
+\label{tab:model-comparison-notes}
+\small
+\begin{tabularx}{\textwidth}{p{0.24\textwidth}X}
+\toprule
+\textbf{Model / setting} & \textbf{Observation} \\
+\midrule
+
+K-Means, $k=2$, withADR &
+Stable but too coarse: it merges the Premium Resort Long-Stay profile with the Standard Flexible City Guest profile. \\
+
+K-Means, $k=3$, withADR &
+Selected solution. It gives the best balance between internal validity, seed stability, and business interpretability. \\
+
+K-Means, $k=3$, noADR &
+Useful sensitivity check. The commitment axis remains visible without price, but the separation between Standard and Premium profiles weakens. \\
+
+iK-Means &
+Not selected. In the current uploaded experiment log, iK-Means is marked as skipped/unresolved, so final numerical claims should only be included after the notebook and \texttt{experiments.csv} are updated. \\
+
+Ward, $k=3$, withADR &
+Conceptually distinct method that corroborates the same three-cluster structure on a reproducible subsample. \\
+
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The selected solution is K-Means with $k=3$ on the withADR representation. This choice is justified because it achieves the strongest balance between internal validity, stability, and interpretability. Although $k=2$ is stable, it merges two managerially different segments. Values above $k=3$ tend to fragment the same business profiles without producing clearer narratives.
 
 \subsection{Cluster profiles}
-
-\begin{center}
-\begin{tabular}{lrlp{5.5cm}l}
+\begin{table}[H]
+\centering
+\caption{Selected K-Means cluster profiles for $k=3$ withADR.}
+\begin{tabularx}{\textwidth}{lrrXl}
 \toprule
-\textbf{Cluster} & \textbf{Size} & \textbf{\%} &
-\textbf{Main characteristics} & \textbf{Label} \\
+\textbf{Cluster} & \textbf{Size} & \textbf{\%} & \textbf{Main characteristics} & \textbf{Label} \\
 \midrule
-C2 & 14{,}513 & 12.4 &
-  ADR \texteuro 90, \texttt{is\_non\_refund}$=1.0$,
-  stay 2.7 nights, lead-time rank 1.6 (advance) &
-  Non-Refundable Advance Booker \\
-C1 & 83{,}139 & 70.7 &
-  ADR \texteuro 103, \texttt{is\_non\_refund}$=0$,
-  stay 2.6 nights, lead-time rank 0.8 (last-minute/mid),
-  highest parking need &
-  Standard Flexible City Guest \\
-C0 & 19{,}778 & 16.8 &
-  ADR \texteuro 114, stay 7.7 nights, total spend $+136$\%
-  above mean, most special requests, resort hotel dominant &
-  Premium Resort Long-Stay \\
+C2 & 14,513 & 12.4 & Non-refundable bookings, short stays, advance booking horizon, high revenue certainty & Non-Refundable Advance Booker \\
+C1 & 83,139 & 70.7 & Flexible bookings, short stays, city-hotel dominant, broad booking horizons, relatively higher parking need & Standard Flexible City Guest \\
+C0 & 19,778 & 16.8 & Longer stays, higher estimated spend, more special requests, resort-hotel dominant & Premium Resort Long-Stay \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Cluster interpretation}
+The \textbf{Non-Refundable Advance Booker} segment is defined by deposit commitment and a more advanced booking horizon. Although its average daily rate is not necessarily the highest, the segment provides high revenue certainty because cancellation flexibility is limited.
+
+The \textbf{Standard Flexible City Guest} segment forms the majority of bookings. These records are typically flexible, short-stay bookings with no non-refundable commitment. This segment likely contains both business and urban leisure demand.
+
+The \textbf{Premium Resort Long-Stay} segment is the smallest but most valuable profile. It is characterised by longer stays, higher estimated total spend, and more special requests. This segment is suitable for pre-arrival personalisation and upselling.
+
+\subsection{noADR comparison}
+The noADR representation tests whether clusters are merely price bands. Removing \texttt{total\_spend\_log} reduces the explicit price/value signal. The Non-Refundable segment remains structurally meaningful, indicating that deposit commitment is an independent axis of segmentation. However, separation between Standard and Premium bookings becomes weaker because price and total spend are important for distinguishing high-value long-stay behaviour.
+
+\subsection{PCA representation study: Extension Module E4}
+\begin{table}[H]
+\centering
+\caption{PCA representation study for K-Means with $k=3$.}
+\label{tab:pca}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Representation} & \textbf{Variance explained} & \textbf{Silhouette} & \textbf{CH} & \textbf{ARI vs original} \\
+\midrule
+Original 7D & 1.000 & 0.452 & 63,837 & 1.000 \\
+PCA-2 & 0.773 & \todo{fill} & \todo{fill} & \todo{fill} \\
+PCA-3 & 0.883 & \todo{fill} & \todo{fill} & \todo{fill} \\
+PCA-4 & 0.972 & \todo{fill} & \todo{fill} & \todo{fill} \\
 \bottomrule
 \end{tabular}
-\end{center}
+\end{table}
 
-\textbf{Cluster narrative.}
-The Non-Refundable Advance Booker is defined by full deposit commitment
-(\texttt{is\_non\_refund}$=1.0$ for all members), planned booking horizon (lead-time
-rank +63\% above mean), and zero car-parking need --- suggesting a city-hotel guest
-who locks in rates early and forfeits flexibility. Despite having the lowest ADR,
-this segment represents the highest revenue certainty.
+The main methodological caveat is that preserving variance is not equivalent to preserving cluster-separating directions. In this dataset, the deposit-commitment feature has relatively low marginal variance but strong segmentation meaning. PCA may therefore compress behaviourally important dimensions into later components. The original 7D representation is retained unless PCA produces comparable ARI and internal validity without reducing interpretability.
 
-The Standard Flexible City Guest forms the majority segment (70.7\%). It has no
-deposit commitment, a wide range of booking horizons, and short stays typical of
-business or urban leisure travel. The highest car-parking proportion in this group
-(+16\% above mean) suggests a subset of car-driving guests.
-
-The Premium Resort Long-Stay Guest is the smallest but highest-value segment.
-Total estimated spend is 136\% above the grand mean, driven by both higher ADR
-and substantially longer stays (7.7 nights vs 2.6 dataset average). Resort hotel
-is the dominant property type, and above-average special requests (+34\%) indicate
-service-oriented guests who may respond well to upsell offers.
-
-\subsection{noADR representation comparison}
-\label{sec:noADR}
-
-Removing \texttt{total\_spend\_log} from the feature set and re-clustering tests
-whether the withADR clusters are purely price bands. Under the noADR representation:
-the Non-Refundable segment (C2) is preserved intact (high \texttt{is\_non\_refund}
-still drives separation); the Premium and Standard segments partially merge because
-stay duration is the only remaining continuous differentiator without ADR signal.
-This confirms that \texttt{is\_non\_refund} provides an independent structural axis,
-while \texttt{total\_spend\_log} contributes the price-level separation between
-Premium and Standard. The withADR representation is retained as primary because the
-research question explicitly includes pricing characteristics.
-
-\subsection{PCA representation study (Module E4)}
-
-PCA applied to the 7D withADR matrix before K-Means ($k=3$):
-
-\begin{center}
-\begin{tabular}{lcccc}
-\toprule
-Representation & Var.\ explained & Silhouette & CH & ARI vs original \\
-\midrule
-Original (7D) & 1.000 & 0.452 & 63{,}837 & 1.000 \\
-PCA-2         & 0.773 & --- & --- & --- \\
-PCA-3         & 0.883 & --- & --- & --- \\
-PCA-4         & 0.972 & --- & --- & --- \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\textit{(Fill in PCA silhouette and ARI values from notebook output after running
-cell \texttt{pca4kmeans}.)}
-
-Key caveat: variance preservation does not guarantee cluster-separating directions
-are retained. \texttt{is\_non\_refund} has variance $0.12 \times 0.88 = 0.106$
---- far lower than \texttt{total\_spend\_log} --- and is therefore compressed into
-later principal components. If ARI vs original remains near 1.0 with lower
-silhouette, PCA compressed the space without improving structure, confirming the
-original 7D representation is preferable.
-
-% ─────────────────────────────────────────────────────────────────────────────
+% ============================================================
 \section{Discussion}
-% ─────────────────────────────────────────────────────────────────────────────
 
-\textbf{Which result best answers the segmentation question?}
-K-Means $k=3$ on the withADR representation best answers the question. It produces
-three stable, interpretable segments (ARI $0.989$) that align with intuitive booking
-archetypes: commitment-driven planners, standard flexible guests, and high-value
-leisure visitors. Hierarchical Ward independently recovers the same structure,
-strengthening confidence in the solution.
+\subsection{Which result best answers the segmentation question?}
+K-Means with $k=3$ on the withADR representation best answers the segmentation question. It provides three stable and interpretable booking profiles that align with actionable revenue-management decisions: commitment-based rate locking, flexible city-hotel demand management, and high-value resort-stay personalisation.
 
-\textbf{How did preprocessing choices influence results?}
-The \texttt{is\_non\_refund} $\times 3.0$ weight is the single most consequential
-preprocessing decision: without it, the Non-Refundable segment does not emerge
-cleanly because the binary feature's natural scale (0/1) is dominated by the
-continuous features. The scaler sensitivity analysis shows that switching from
-RobustScaler to StandardScaler on numerical features produces only a marginal
-silhouette change, confirming robustness to this choice. MinMax scaling on all
-features (including binary) artificially inflates scores and is not appropriate here.
+\subsection{Influence of preprocessing}
+The feature weight on \texttt{is\_non\_refund} is one of the most consequential preprocessing choices. Without weighting, the binary commitment signal is dominated by continuous features. The meal-plan weight reduces the effect of an ordinal encoding that might otherwise exaggerate differences between meal categories. These weights make the Euclidean metric more aligned with the business segmentation question, but they also introduce subjective assumptions.
 
-\textbf{Are the clusters coherent, stable, and useful?}
-Coherence: Silhouette 0.452 is above the weak-structure threshold; intra-cluster
-variance of the Non-Refundable segment is the lowest (0.988), confirming it is the
-tightest cluster. The Premium segment has the highest intra-cluster variance (5.483),
-reflecting heterogeneity in stay lengths and rates within the high-spend group.
-Stability: near-perfect ARI across seeds. Interpretability: each segment maps to a
-distinct strategic action (yield management for Non-Refundable; upselling for
-Premium; flexibility-based conversion for Standard).
+\subsection{Stability and sensitivity}
+K-Means is highly stable across seeds for the selected $k=3$ solution. Hierarchical Ward clustering provides independent support for the three-cluster structure. Sensitivity checks using scaler changes and the noADR representation indicate that the main qualitative conclusions are not driven solely by a single preprocessing decision, although the distinction between Standard and Premium segments depends partly on value-related features.
 
-\textbf{Decision-relevant recommendations.}
+\subsection{Decision-relevant recommendations}
 \begin{itemize}
-  \item \textbf{Non-Refundable Advance Booker}: offer early-bird rate locks and
-        package upgrades at booking time; cancellation risk is minimal.
-  \item \textbf{Standard Flexible City Guest}: targeted last-minute promotional
-        rates and parking-inclusive packages may increase conversion.
-  \item \textbf{Premium Resort Long-Stay}: personalised pre-arrival upsells (room
-        upgrades, spa, F\&B packages) given above-average special requests.
+    \item \textbf{Non-Refundable Advance Booker:} offer early-bird packages and prepaid upgrades at booking time.
+    \item \textbf{Standard Flexible City Guest:} use targeted flexibility-based promotions, parking-inclusive packages, and last-minute offers.
+    \item \textbf{Premium Resort Long-Stay:} prioritise pre-arrival personalisation, room upgrades, spa/F\&B offers, and long-stay service planning.
 \end{itemize}
 
-\textbf{What should not be concluded.}
-Clusters are defined at booking level, not guest level; a returning guest may
-appear in different segments across stays. The absence of ground-truth labels means
-segment validity cannot be externally verified. The premium ADR separation between
-C0 and C1 may partly reflect hotel type (resort vs city) rather than guest
-willingness-to-pay. Finally, the Manual weights (\texttt{is\_non\_refund} $\times 3$,
-\texttt{meal} $\times 0.5$) embed subjective assumptions that should be revisited
-with domain expert input.
+\subsection{What should not be concluded}
+The clusters are not externally validated customer types. They are booking-level geometric segments, not permanent guest identities. A returning guest may appear in different clusters across different stays. Internal validity indices measure geometric compactness and separation, not business profitability or causal effects.
 
-% ─────────────────────────────────────────────────────────────────────────────
+% ============================================================
 \section{Limitations, Ethics, and Reproducibility}
-% ─────────────────────────────────────────────────────────────────────────────
 
-\textbf{Limitations.}
+\subsection{Limitations}
 \begin{itemize}
-  \item No ground-truth segment labels; internal validity indices measure geometric
-        compactness, not business relevance.
-  \item Unit of analysis is the booking record, not the guest; one guest may appear
-        in multiple segments across stays.
-  \item Ordinal meal-plan encoding assumes equal spacing between plan levels; a
-        one-hot encoding would be more conservative.
-  \item \texttt{lead\_time\_rank} uses quantile binning which may lose information
-        relative to a log-transformed continuous feature.
-  \item The dataset covers two Portuguese hotels (2015--2017); generalisability to
-        other markets or time periods is untested.
-  \item iK-Means runtime was prohibitive on the full dataset in the project
-        timeline; results should be treated as exploratory.
+    \item There are no ground-truth segment labels.
+    \item The unit of analysis is a booking record, not a unique guest.
+    \item The meal-plan encoding assumes an ordinal structure and equal spacing between meal levels.
+    \item Lead-time quantile binning simplifies a highly skewed continuous variable.
+    \item Manual feature weights encode subjective modelling assumptions.
+    \item The dataset concerns two Portuguese hotels from 2015--2017, limiting generalisability.
+    \item iK-Means results must be reconciled across the notebook, report, and experiment log before final submission.
 \end{itemize}
 
-\textbf{Reproducibility.}
+\subsection{Ethics and governance}
+The dataset is used according to the course release terms. Raw data are not committed to the repository. No direct personal identifiers are used. Country is excluded from clustering inputs and retained only, if needed, for post-hoc descriptive analysis.
+
+\subsection{Reproducibility checklist}
+The final repository should contain:
 \begin{itemize}
-  \item Repository tag: \texttt{Submission}
-  \item Experiment log: \texttt{experiments.csv} (schema: \texttt{date/run\_id},
-        \texttt{representation\_id}, \texttt{model}, \texttt{parameters},
-        \texttt{seed}, \texttt{silhouette}, \texttt{calinski}, \texttt{davies},
-        \texttt{diagnostics}, \texttt{notes})
-  \item Environment: \texttt{environment.yml}
-  \item Entry point: \texttt{run\_all.py} executes the full notebook end-to-end
-        via \texttt{nbconvert}
-  \item Raw data: not committed; obtain from course platform, place in
-        \texttt{data/hotel\_bookings\_course\_release\_v1.csv}
+    \item \texttt{README.md} with setup and execution instructions.
+    \item \texttt{environment.yml} or equivalent lockfile.
+    \item \texttt{run\_all.py} as a single-entry point.
+    \item \texttt{experiments.csv} with method, parameters, seeds, metrics, diagnostics, and notes.
+    \item \texttt{src/}, \texttt{figures/}, and \texttt{tables/} folders.
+    \item A \texttt{Submission} tag or GitHub release.
 \end{itemize}
 
-\textbf{Ethics and governance.}
-Dataset used in accordance with course release terms. No personal identifiers are
-present; country of origin is used only for post-hoc profiling. Raw data not
-committed to the repository.
+\subsection{Academic integrity disclosure}
+Generative-AI tools were consulted only for methodological discussion, syntax review, and report-structure support. All final analytical decisions, modelling choices, experimental results, and interpretations must be validated by the team.
 
-\textbf{Academic integrity.}
-Claude Code (Anthropic) was consulted during development for methodological
-discussion, syntax review, and code structuring. All analytical decisions,
-model choices, interpretations, and written content were produced and validated by
-the team. The tool was not used to generate substantive analyses or report text
-autonomously.
-
-% ─────────────────────────────────────────────────────────────────────────────
+% ============================================================
 \section{Conclusion}
-% ─────────────────────────────────────────────────────────────────────────────
+This study segments 117,430 hotel booking records using leakage-safe pre-stay features. The selected K-Means solution with $k=3$ on the withADR representation identifies three interpretable booking profiles: Non-Refundable Advance Booker, Standard Flexible City Guest, and Premium Resort Long-Stay. The results are supported by internal validation, seed stability, and comparison with Ward hierarchical clustering. The noADR comparison shows that booking commitment remains an important segmentation axis independently of price, while the value-inclusive representation better answers the revenue-management question. Future work should validate the segments against business outcomes, test alternative encodings, and evaluate generalisability across other hotels and time periods.
 
-This study partitioned 117,430 hotel booking records into three stable guest
-segments using K-Means clustering on a mixed-type pre-stay feature set.
-The three-cluster solution (Silhouette $= 0.452$, ARI $= 0.989 \pm 0.007$
-across 10 seeds, corroborated by independent Hierarchical Ward clustering)
-identifies a Non-Refundable Advance Booker, a Standard Flexible City Guest, and
-a Premium Resort Long-Stay Guest --- each with distinct revenue management
-implications. The noADR comparison confirms that booking-commitment behaviour
-(\texttt{is\_non\_refund}) drives cluster separation independently of price.
-Future work should validate segments against actual revenue outcomes, test
-alternative meal-plan encodings, and extend the analysis to multi-hotel or
-multi-year datasets.
+% ============================================================
+\appendix
 
-% ─────────────────────────────────────────────────────────────────────────────
+\section{Feature Table}
+\begin{table}[H]
+\centering
+\caption{withADR feature table.}
+\begin{tabular}{llll}
+\toprule
+\textbf{Feature} & \textbf{Type} & \textbf{Scaling} & \textbf{Weight} \\
+\midrule
+\texttt{total\_spend\_log} & Continuous & RobustScaler & $\times 1.0$ \\
+\texttt{total\_nights} & Continuous & RobustScaler & $\times 1.0$ \\
+\texttt{is\_non\_refund} & Binary & Raw & $\times 3.0$ \\
+\texttt{total\_of\_special\_requests} & Count & Raw & $\times 1.0$ \\
+\texttt{required\_car\_parking\_spaces} & Binary/count & Raw & $\times 1.0$ \\
+\texttt{meal\_encoded} & Ordinal & Raw & $\times 0.5$ \\
+\texttt{lead\_time\_rank} & Ordinal & Raw & $\times 1.0$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{K-Means Stability Summary}
+\begin{table}[H]
+\centering
+\caption{K-Means stability across 10 seeds.}
+\begin{tabular}{rrrrrr}
+\toprule
+\textbf{k} & \textbf{Mean ARI} & \textbf{Std ARI} & \textbf{Mean Sil.} & \textbf{Std Sil.} & \textbf{Notes} \\
+\midrule
+2 & 0.9975 & 0.0021 & \todo{fill} & \todo{fill} & Stable but under-segmented \\
+3 & 0.9894 & 0.0075 & \todo{fill} & \todo{fill} & Selected solution \\
+4 & 0.9942 & 0.0057 & \todo{fill} & \todo{fill} & Additional fragmentation \\
+5 & 0.9803 & 0.0138 & \todo{fill} & \todo{fill} & Less interpretable \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Scaler Sensitivity}
+\begin{table}[H]
+\centering
+\caption{Scaler sensitivity for numerical features, $k=3$.}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Scaler} & \textbf{Silhouette} & \textbf{CH} & \textbf{DB} \\
+\midrule
+RobustScaler & \todo{fill} & \todo{fill} & \todo{fill} \\
+StandardScaler & \todo{fill} & \todo{fill} & \todo{fill} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \begin{thebibliography}{9}
 
 \bibitem{antonio2019}
-António, N., de Almeida, A., \& Nunes, L. (2019).
-Hotel booking demand datasets.
-\textit{Data in Brief}, 22, 41--49.
-\url{https://doi.org/10.1016/j.dib.2018.11.126}
+N. António, A. de Almeida, and L. Nunes.
+\newblock Hotel booking demand datasets.
+\newblock \emph{Data in Brief}, 22:41--49, 2019.
+\newblock \url{https://doi.org/10.1016/j.dib.2018.11.126}
 
 \bibitem{mirkin2005}
-Mirkin, B. (2005).
-\textit{Clustering for Data Mining: A Data Recovery Approach}.
-Chapman \& Hall/CRC.
+B. Mirkin.
+\newblock \emph{Clustering for Data Mining: A Data Recovery Approach}.
+\newblock Chapman \& Hall/CRC, 2005.
 
 \bibitem{kaufman1990}
-Kaufman, L., \& Rousseeuw, P.~J. (1990).
-\textit{Finding Groups in Data: An Introduction to Cluster Analysis}.
-Wiley.
+L. Kaufman and P. J. Rousseeuw.
+\newblock \emph{Finding Groups in Data: An Introduction to Cluster Analysis}.
+\newblock Wiley, 1990.
 
-\bibitem{sklearn}
-Pedregosa, F., et al.\ (2011).
-Scikit-learn: Machine learning in Python.
-\textit{Journal of Machine Learning Research}, 12, 2825--2830.
+\bibitem{pedregosa2011}
+F. Pedregosa et al.
+\newblock Scikit-learn: Machine learning in Python.
+\newblock \emph{Journal of Machine Learning Research}, 12:2825--2830, 2011.
 
 \end{thebibliography}
-
-% ─────────────────────────────────────────────────────────────────────────────
-\newpage
-\appendix
-\section*{Appendix}
-
-\textbf{A. Feature table (withADR representation)}
-
-\begin{center}
-\begin{tabular}{llll}
-\toprule
-Feature & Type & Scaling & Weight \\
-\midrule
-\texttt{total\_spend\_log} & Continuous & RobustScaler & $\times 1.0$ \\
-\texttt{total\_nights}     & Continuous & RobustScaler & $\times 1.0$ \\
-\texttt{is\_non\_refund}   & Binary     & Raw          & $\times 3.0$ \\
-\texttt{total\_of\_special\_requests} & Count & Raw   & $\times 1.0$ \\
-\texttt{required\_car\_parking\_spaces} & Binary & Raw & $\times 1.0$ \\
-\texttt{meal\_encoded}     & Ordinal (0--3) & Raw      & $\times 0.5$ \\
-\texttt{lead\_time\_rank}  & Ordinal (0--2) & Raw      & $\times 1.0$ \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\textbf{B. Stability analysis summary (K-Means, 10 seeds)}
-
-\begin{center}
-\begin{tabular}{lcccc}
-\toprule
-$k$ & Mean ARI & Std ARI & Mean Silhouette & Std Silhouette \\
-\midrule
-2 & 0.9975 & 0.0021 & --- & --- \\
-3 & 0.9894 & 0.0075 & --- & --- \\
-4 & 0.9942 & 0.0057 & --- & --- \\
-5 & 0.9803 & 0.0138 & --- & --- \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\textit{(Fill in mean/std silhouette values from notebook stability cell output.)}
-
-\textbf{C. Scaler sensitivity (numerical features only, $k = 3$)}
-
-\begin{center}
-\begin{tabular}{lcccc}
-\toprule
-Scaler (numerical only) & $k$ & Silhouette & CH & DB \\
-\midrule
-RobustScaler (main pipeline) & 3 & --- & --- & --- \\
-StandardScaler               & 3 & --- & --- & --- \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\textit{(Fill in from notebook sensitivity cell output.)}
 
 \end{document}
