@@ -46,8 +46,8 @@ date/run_id,representation_id,sample_rule,model,parameters,runtime,seed,silhouet
 2026-06-05 17:35:06,R-EUCLID-robust-weighted-withADR,full data; silhouette sample_size=10000,kmeans_sensitivity,"k=2, scaler=RobustScaler unweighted (all weights=1.0)",,42,0.43480617992128145,67610.23361616381,1.0089620181932544,OK,sensitivity: RobustScaler unweighted (all weights=1.0),2
 2026-06-05 17:35:06,R-EUCLID-robust-weighted-withADR,full data; silhouette sample_size=10000,kmeans_sensitivity,"k=3, scaler=RobustScaler unweighted (all weights=1.0)",,42,0.25456172722000736,53666.663961124774,1.3843849291091475,OK,sensitivity: RobustScaler unweighted (all weights=1.0),3
 2026-06-05 17:35:06,R-EUCLID-robust-weighted-withADR,full data; silhouette sample_size=10000,kmeans_sensitivity,"k=4, scaler=RobustScaler unweighted (all weights=1.0)",,42,0.26870324529162665,52149.78164816761,1.2400682471907343,OK,sensitivity: RobustScaler unweighted (all weights=1.0),4
-2026-06-05 17:35:33,E4-Original 7D,kmeans_pca,"k=3, seeds=[42, 7, 123]","[42, 7, 123]",0.453,,,OK,E4 sil=0.453+/-0.0022 ari=1.0+/-0.0
-2026-06-05 17:35:33,E4-PCA-2,kmeans_pca,"k=3, seeds=[42, 7, 123]","[42, 7, 123]",0.593,,,OK,E4 sil=0.593+/-0.0016 ari=0.9916+/-0.0019
-2026-06-05 17:35:33,E4-PCA-3,kmeans_pca,"k=3, seeds=[42, 7, 123]","[42, 7, 123]",0.504,,,OK,E4 sil=0.504+/-0.0023 ari=0.9877+/-0.0036
-2026-06-05 17:35:33,E4-PCA-4,kmeans_pca,"k=3, seeds=[42, 7, 123]","[42, 7, 123]",0.472,,,OK,E4 sil=0.472+/-0.0027 ari=0.9882+/-0.0008
-2026-06-05 17:35:35,R-EUCLID-robust-weighted-withADR,e1_anomaly,"k=3, seeds=[42, 7, 123]","[42, 7, 123]",,,,OK,E1: core=20/20 noadr_overlap=17/20
+2026-06-05 18:34:54,E4-Original 7D,"full data; PCA comparison; seeds=[42, 7, 123]",kmeans_pca,"k=3, seeds=[42, 7, 123]",,"[42, 7, 123]",0.453,,,OK,E4 sil=0.453+/-0.0022 ari=1.0+/-0.0,3
+2026-06-05 18:34:54,E4-PCA-2,"full data; PCA comparison; seeds=[42, 7, 123]",kmeans_pca,"k=3, seeds=[42, 7, 123]",,"[42, 7, 123]",0.593,,,OK,E4 sil=0.593+/-0.0016 ari=0.9916+/-0.0019,3
+2026-06-05 18:34:54,E4-PCA-3,"full data; PCA comparison; seeds=[42, 7, 123]",kmeans_pca,"k=3, seeds=[42, 7, 123]",,"[42, 7, 123]",0.504,,,OK,E4 sil=0.504+/-0.0023 ari=0.9877+/-0.0036,3
+2026-06-05 18:34:54,E4-PCA-4,"full data; PCA comparison; seeds=[42, 7, 123]",kmeans_pca,"k=3, seeds=[42, 7, 123]",,"[42, 7, 123]",0.472,,,OK,E4 sil=0.472+/-0.0027 ari=0.9882+/-0.0008,3
+2026-06-05 18:34:55,R-EUCLID-robust-weighted-withADR,"full data; top-20 cluster-aware anomalies; seeds=[42, 7, 123]",e1_anomaly,"k=3, seeds=[42, 7, 123]",,"[42, 7, 123]",,,,OK,E1: core=20/20 noadr_overlap=17/20,3

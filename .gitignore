@@ -1,4 +1,5 @@
 data/
+HotelBooking_Course_release_v1/
 
 # LaTeX build artifacts
 *.aux
@@ -28,6 +29,7 @@ data/
 *.xdy
 *.dvi
 *.ps
+*.tex
 
 # LaTeX generated source files (not the main report)
 *.bbl

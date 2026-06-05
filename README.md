@@ -14,9 +14,7 @@ UnsupervisedLearningProj/
 ├── project.ipynb          # Main notebook (all code, figures, and results)
 ├── run_all.py             # Single entry point — reproduces all results
 ├── experiments.csv        # Experiment log (method, parameters, metrics)
-├── requirements.txt       # Pip dependencies with pinned versions
 ├── environment.yml        # Full conda environment export
-├── assignment.tex         # Report source
 ├── assignment.pdf         # Compiled report
 └── data/                  # Place dataset here (not committed)
 ```
@@ -60,6 +58,7 @@ python run_all.py
 ```
 
 This will:
+
 1. Check that `nbconvert` is installed (installs it if missing)
 2. Verify the dataset is present
 3. Set `FAST_MODE = False` (full 10-seed run)

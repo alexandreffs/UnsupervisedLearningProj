@@ -362,8 +362,7 @@ PCA-4       & 0.972 & 0.472 & 0.003 & 0.988 & 0.001 \\
 \end{tabular}
 \end{table}
 
-PCA-2 raises the silhouette to 0.593 but the ARI against the original solution remains 0.992, showing that the two-dimensional projection recovers the same cluster structure while compressing the feature space. PCA-4 retains 97.2\% of variance and achieves ARI $=0.988 \pm 0.001$. Despite the improved silhouette, the original 7D representation is retained as the primary space because PCA components are linear combinations of all features, reducing interpretability.
-
+PCA-2 raises the Silhouette to 0.593 and remains highly consistent with the original partition (ARI = 0.992). However, the original 7D representation is retained as the primary space because the PCA axes are linear combinations of the original variables, which reduces direct interpretability for business profiling.
 \subsection{Extension E1: Cluster-aware Anomaly Analysis}
 
 Anomalies are defined relative to the learned cluster structure rather than globally. For each booking $i$ assigned to cluster $c_i$, the anomaly score is the normalised distance to the centroid:
@@ -388,11 +387,13 @@ Top-20 in all 3 seeds (stability) & 20/20 \\ % <-- Multicolumn removido
 \end{tabular}
 \end{table}
 
+Most data-quality suspects correspond to extreme or inconsistent booking values, especially unusually large ADR or stay-duration combinations relative to their assigned cluster.
+
 \textbf{Stability} (3 seeds: 42, 7, 123): 20/20 anomalies appear in all three top-20 sets, confirming that the anomaly ranking is perfectly robust to K-Means initialisation.
 
 \textbf{Sensitivity}: comparing the withADR and noADR top-20 sets yields an overlap of 17/20, indicating that removing the price signal changes which bookings appear most anomalous. Some outliers are driven by extreme ADR values; without this feature, the commitment and stay-length axes become relatively more important for identifying unusual records.
 
-Limitations: Without true anomaly labels, an unusual booking is not necessarily a data error. Additionally, our anomaly score assumes that clusters are perfectly round, just like K-Means does.
+\textbf{Limitations}: Without true anomaly labels, an unusual booking is not necessarily a data error. Additionally, our anomaly score assumes that clusters are perfectly round, just like K-Means does.
 % ============================================================
 \section{Discussion}
 
