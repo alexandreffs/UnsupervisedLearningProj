@@ -392,8 +392,7 @@ Top-20 in all 3 seeds (stability) & 20/20 \\ % <-- Multicolumn removido
 
 \textbf{Sensitivity}: comparing the withADR and noADR top-20 sets yields an overlap of 17/20, indicating that removing the price signal changes which bookings appear most anomalous. Some outliers are driven by extreme ADR values; without this feature, the commitment and stay-length axes become relatively more important for identifying unusual records.
 
-\textbf{Limitations}: there are no ground-truth anomaly labels, so rare does not imply erroneous. The centroid-based score assumes spherical clusters, consistent with K-Means. 
-
+Limitations: Without true anomaly labels, an unusual booking is not necessarily a data error. Additionally, our anomaly score assumes that clusters are perfectly round, just like K-Means does.
 % ============================================================
 \section{Discussion}
 
