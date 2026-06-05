@@ -28,12 +28,6 @@ conda env create -f environment.yml
 conda activate UnsupervisedLearning
 ```
 
-Or with pip only:
-
-```bash
-pip install -r requirements.txt
-```
-
 ### 2. Register the Jupyter kernel
 
 ```bash
