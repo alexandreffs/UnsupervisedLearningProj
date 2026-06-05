@@ -27,6 +27,13 @@ import sys
 import argparse
 import time
 import os
+import importlib.util
+
+if importlib.util.find_spec("nbconvert") is None:
+    print("nbconvert not found — installing...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "nbconvert"])
+else:
+    print("nbconvert already installed — skipping.")
 
 
 def check_dataset():
@@ -75,8 +82,7 @@ def run_notebook():
         "--execute",
         "--inplace",
         "--ExecutePreprocessor.timeout=3600",
-        "--ExecutePreprocessor.kernel_name=python3",
-        "--output", "project_executed.ipynb",
+        "--ExecutePreprocessor.kernel_name=UnsupervisedLearning",
         "project.ipynb",
     ]
     print("\nExecuting notebook...")
@@ -89,7 +95,7 @@ def run_notebook():
 
     if result.returncode == 0:
         print(f"\nNotebook executed successfully in {elapsed:.1f}s.")
-        print("Output saved to: project_executed.ipynb")
+        print("Output saved to: project.ipynb")
         print("Experiment log:  experiments.csv")
     else:
         print(f"\nERROR: Notebook execution failed (return code {result.returncode}).")

@@ -342,6 +342,61 @@ The \textbf{Premium Resort Long-Stay} segment is the smallest but most valuable 
 \subsection{noADR comparison}
 The noADR representation tests whether clusters are merely price bands. Removing \texttt{total\_spend\_log} reduces the explicit price/value signal. The Non-Refundable segment remains structurally meaningful, indicating that deposit commitment is an independent axis of segmentation. However, separation between Standard and Premium bookings becomes weaker because price and total spend are important for distinguishing high-value long-stay behaviour.
 
+\subsection{Extension E4: PCA Study}
+
+The first principal component explains 54.3\% of the variance and the first four components together account for 97.2\%, indicating that the withADR representation has moderate linear structure. The PCA loadings show that PC1 is dominated by \texttt{total\_nights}, while PC2 captures the commitment axis (\texttt{is\_non\_refund}).
+
+\begin{table}[H]
+\centering
+\caption{PCA clustering comparison for K-Means $k=3$ (3 seeds: 42, 7, 123).}
+\label{tab:e4-pca}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Representation} & \textbf{Var.\ explained} & \textbf{Mean Sil.} & \textbf{Std Sil.} & \textbf{Mean ARI} & \textbf{Std ARI} \\
+\midrule
+Original 7D & 1.000 & 0.453 & 0.002 & 1.000 & 0.000 \\
+PCA-2       & 0.773 & 0.593 & 0.002 & 0.992 & 0.002 \\
+PCA-3       & 0.883 & 0.504 & 0.002 & 0.988 & 0.004 \\
+PCA-4       & 0.972 & 0.472 & 0.003 & 0.988 & 0.001 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+PCA-2 raises the silhouette to 0.593 but the ARI against the original solution remains 0.992, showing that the two-dimensional projection recovers the same cluster structure while compressing the feature space. PCA-4 retains 97.2\% of variance and achieves ARI $=0.988 \pm 0.001$. Despite the improved silhouette, the original 7D representation is retained as the primary space because PCA components are linear combinations of all features, reducing interpretability.
+
+The key methodological caveat is that variance preservation is not equivalent to preserving cluster-separating directions. \texttt{is\_non\_refund} has low marginal variance but is the principal driver of the commitment-based segment. PCA may therefore compress behaviourally important axes into later components; the empirical evidence (high ARI even at PCA-2) suggests this risk is limited here, but interpretability is nonetheless reduced.
+
+\subsection{Extension E1: Cluster-aware Anomaly Analysis}
+
+Anomalies are defined relative to the learned cluster structure rather than globally. For each booking $i$ assigned to cluster $c_i$, the anomaly score is the normalised distance to the centroid:
+\[
+\text{score}_i = \frac{\|x_i - \mu_{c_i}\|_2}{\sigma_{c_i}},
+\]
+where $\sigma_{c_i}$ is the standard deviation of intra-cluster distances. A high score indicates a booking that is unusual relative to its own segment.
+
+The top-20 anomalies are divided into two categories. \textbf{Data-quality suspects} are records with ADR above the 99th percentile or total nights above 30, which may reflect data-entry errors or test bookings. \textbf{Rare-but-plausible} anomalies have extreme feature combinations that are unusual but operationally possible (e.g., very high special-request count with a non-refundable deposit and a short stay).
+
+\begin{table}[H]
+\centering
+\caption{E1 anomaly analysis summary.}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Metric} & \textbf{withADR} & \textbf{noADR} \\
+\midrule
+Data-quality suspects (top-20) & 18 & --- \\
+Rare-but-plausible (top-20) & 2 & --- \\
+Top-20 overlap (withADR vs noADR) & \multicolumn{2}{c}{17/20} \\
+Top-20 in all 3 seeds (stability) & \multicolumn{2}{c}{20/20} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Stability} (3 seeds: 42, 7, 123): 20/20 anomalies appear in all three top-20 sets, confirming that the anomaly ranking is perfectly robust to K-Means initialisation.
+
+\textbf{Sensitivity}: comparing the withADR and noADR top-20 sets yields an overlap of 17/20, indicating that removing the price signal changes which bookings appear most anomalous. Some outliers are driven by extreme ADR values; without this feature, the commitment and stay-length axes become relatively more important for identifying unusual records.
+
+\textbf{Limitations}: there are no ground-truth anomaly labels, so rare does not imply erroneous. The centroid-based score assumes spherical clusters, consistent with K-Means. Conflating rare-but-plausible bookings with data-quality issues is a practical risk; the classification above uses domain rules rather than a learned detector.
+
 % ============================================================
 \section{Discussion}
 
