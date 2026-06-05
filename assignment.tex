@@ -364,8 +364,6 @@ PCA-4       & 0.972 & 0.472 & 0.003 & 0.988 & 0.001 \\
 
 PCA-2 raises the silhouette to 0.593 but the ARI against the original solution remains 0.992, showing that the two-dimensional projection recovers the same cluster structure while compressing the feature space. PCA-4 retains 97.2\% of variance and achieves ARI $=0.988 \pm 0.001$. Despite the improved silhouette, the original 7D representation is retained as the primary space because PCA components are linear combinations of all features, reducing interpretability.
 
-The key methodological caveat is that variance preservation is not equivalent to preserving cluster-separating directions. \texttt{is\_non\_refund} has low marginal variance but is the principal driver of the commitment-based segment. PCA may therefore compress behaviourally important axes into later components; the empirical evidence (high ARI even at PCA-2) suggests this risk is limited here, but interpretability is nonetheless reduced.
-
 \subsection{Extension E1: Cluster-aware Anomaly Analysis}
 
 Anomalies are defined relative to the learned cluster structure rather than globally. For each booking $i$ assigned to cluster $c_i$, the anomaly score is the normalised distance to the centroid:
@@ -374,19 +372,18 @@ Anomalies are defined relative to the learned cluster structure rather than glob
 \]
 where $\sigma_{c_i}$ is the standard deviation of intra-cluster distances. A high score indicates a booking that is unusual relative to its own segment.
 
-The top-20 anomalies are divided into two categories. \textbf{Data-quality suspects} are records with ADR above the 99th percentile or total nights above 30, which may reflect data-entry errors or test bookings. \textbf{Rare-but-plausible} anomalies have extreme feature combinations that are unusual but operationally possible (e.g., very high special-request count with a non-refundable deposit and a short stay).
 
 \begin{table}[H]
 \centering
 \caption{E1 anomaly analysis summary.}
-\begin{tabular}{lrr}
+\begin{tabular}{lr} % <-- Alterado de 'lrr' para 'lr' (2 colunas)
 \toprule
-\textbf{Metric} & \textbf{withADR} & \textbf{noADR} \\
+\textbf{Metric} & \textbf{withADR} \\
 \midrule
-Data-quality suspects (top-20) & 18 & --- \\
-Rare-but-plausible (top-20) & 2 & --- \\
-Top-20 overlap (withADR vs noADR) & \multicolumn{2}{c}{17/20} \\
-Top-20 in all 3 seeds (stability) & \multicolumn{2}{c}{20/20} \\
+Data-quality suspects (top-20) & 18 \\
+Rare-but-plausible (top-20) & 2 \\
+Top-20 overlap (withADR vs noADR) & 17/20 \\ % <-- Multicolumn removido
+Top-20 in all 3 seeds (stability) & 20/20 \\ % <-- Multicolumn removido
 \bottomrule
 \end{tabular}
 \end{table}
@@ -395,7 +392,7 @@ Top-20 in all 3 seeds (stability) & \multicolumn{2}{c}{20/20} \\
 
 \textbf{Sensitivity}: comparing the withADR and noADR top-20 sets yields an overlap of 17/20, indicating that removing the price signal changes which bookings appear most anomalous. Some outliers are driven by extreme ADR values; without this feature, the commitment and stay-length axes become relatively more important for identifying unusual records.
 
-\textbf{Limitations}: there are no ground-truth anomaly labels, so rare does not imply erroneous. The centroid-based score assumes spherical clusters, consistent with K-Means. Conflating rare-but-plausible bookings with data-quality issues is a practical risk; the classification above uses domain rules rather than a learned detector.
+\textbf{Limitations}: there are no ground-truth anomaly labels, so rare does not imply erroneous. The centroid-based score assumes spherical clusters, consistent with K-Means. 
 
 % ============================================================
 \section{Discussion}

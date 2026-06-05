@@ -1,0 +1,21 @@
+adr,total_nights,is_non_refund,total_of_special_requests,required_car_parking_spaces,meal_encoded,lead_time_rank,cluster,score,type
+110.0,69,0,3,0,2,2,0,28.02,data-quality suspect
+110.5,60,0,3,0,2,1,0,23.94,data-quality suspect
+28.79,56,0,0,0,1,1,0,19.3,data-quality suspect
+25.5,56,0,0,0,1,2,0,19.09,data-quality suspect
+40.0,5,0,1,8,2,0,1,18.65,rare-but-plausible
+80.0,4,0,0,8,2,2,1,18.64,rare-but-plausible
+8.34,57,0,2,0,0,2,0,17.94,data-quality suspect
+42.11,45,0,3,0,1,0,0,15.5,data-quality suspect
+39.41,42,0,2,0,1,2,0,14.07,data-quality suspect
+35.7,42,0,1,0,1,2,0,13.91,data-quality suspect
+31.45,42,0,0,0,1,2,0,13.75,data-quality suspect
+22.11,42,0,0,0,1,1,0,13.3,data-quality suspect
+93.0,34,0,0,0,1,0,0,11.85,data-quality suspect
+98.33,33,0,0,0,1,0,0,11.48,data-quality suspect
+98.33,33,0,0,0,1,0,0,11.48,data-quality suspect
+45.0,35,0,1,0,1,2,0,11.3,data-quality suspect
+41.98,35,0,1,0,2,2,0,11.22,data-quality suspect
+41.47,35,0,1,0,1,1,0,11.19,data-quality suspect
+77.0,33,0,0,0,1,0,0,11.15,data-quality suspect
+36.93,35,0,0,0,2,1,0,11.07,data-quality suspect
